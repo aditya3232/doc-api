@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"strconv"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -22,4 +23,13 @@ func CheckPasswordHash(password, hash string) bool {
 		Msg("bcrypt compare")
 
 	return err == nil
+}
+
+func StringToInt64(s string) (int64, error) {
+	newData, err := strconv.ParseInt(s, 10, 64)
+	if err != nil {
+		return 0, err
+	}
+
+	return newData, nil
 }

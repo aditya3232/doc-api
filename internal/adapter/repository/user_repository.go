@@ -5,6 +5,8 @@ import (
 	"doc-api/internal/core/domain/entity"
 	"doc-api/internal/core/domain/model"
 	"errors"
+	"fmt"
+	"math"
 
 	"github.com/rs/zerolog/log"
 	"gorm.io/gorm"
@@ -20,6 +22,7 @@ type UserRepositoryInterface interface {
 	UpdatePasswordByID(ctx context.Context, req entity.UserEntity) error
 	GetUserByID(ctx context.Context, userID int64) (*entity.UserEntity, error)
 	UpdateDataUser(ctx context.Context, req entity.UserEntity) error
+	GetUserAll(ctx context.Context, query entity.QueryStringUser) ([]entity.UserEntity, int64, int64, error)
 }
 
 func NewUserRepository(db *gorm.DB) UserRepositoryInterface {
@@ -165,4 +168,53 @@ func (u *userRepository) UpdateDataUser(ctx context.Context, req entity.UserEnti
 	}
 
 	return nil
+}
+
+func (u *userRepository) GetUserAll(ctx context.Context, query entity.QueryStringUser) ([]entity.UserEntity, int64, int64, error) {
+	users := []model.User{}
+	var countData int64
+
+	order := fmt.Sprintf("%s %s", query.OrderBy, query.OrderType)
+	offset := (query.Page - 1) * query.Limit
+
+	sqlMain := u.db.WithContext(ctx).
+		Where("name ILIKE ? OR email ILIKE ? OR phone ILIKE ?", "%"+query.Search+"%", "%"+query.Search+"%", "%"+query.Search+"%")
+
+	if err := sqlMain.Model(&users).Count(&countData).Error; err != nil {
+		log.Error().
+			Err(err).
+			Str("source", "internal.adapter.userRepository.GetUserAll")
+		return nil, 0, 0, err
+	}
+
+	totalPage := int(math.Ceil(float64(countData) / float64(query.Limit)))
+
+	if err := sqlMain.Order(order).Limit(int(query.Limit)).Offset(int(offset)).Find(&users).Error; err != nil {
+		log.Error().
+			Err(err).
+			Str("source", "internal.adapter.userRepository.GetUserAll")
+		return nil, 0, 0, err
+	}
+
+	if len(users) < 1 {
+		err := errors.New("404")
+		log.Info().
+			Str("source", "internal.adapter.userRepository.GetUserAll").
+			Msg("No user found")
+		return nil, 0, 0, err
+	}
+
+	resp := []entity.UserEntity{}
+	for _, val := range users {
+		resp = append(resp, entity.UserEntity{
+			ID:      val.ID,
+			Name:    val.Name,
+			Email:   val.Email,
+			Phone:   val.Phone,
+			Photo:   val.Photo,
+			Address: val.Address,
+		})
+	}
+
+	return resp, countData, int64(totalPage), nil
 }

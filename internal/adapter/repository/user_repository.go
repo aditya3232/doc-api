@@ -23,6 +23,7 @@ type UserRepositoryInterface interface {
 	GetUserByID(ctx context.Context, userID int64) (*entity.UserEntity, error)
 	UpdateDataUser(ctx context.Context, req entity.UserEntity) error
 	GetUserAll(ctx context.Context, query entity.QueryStringUser) ([]entity.UserEntity, int64, int64, error)
+	DeleteUser(ctx context.Context, userID int64) error
 }
 
 func NewUserRepository(db *gorm.DB) UserRepositoryInterface {
@@ -217,4 +218,35 @@ func (u *userRepository) GetUserAll(ctx context.Context, query entity.QueryStrin
 	}
 
 	return resp, countData, int64(totalPage), nil
+}
+
+func (u *userRepository) DeleteUser(ctx context.Context, userID int64) error {
+	var user model.User
+
+	err := u.db.Transaction(func(tx *gorm.DB) error {
+		if err := u.db.WithContext(ctx).Where("id =?", userID).First(&user).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				err = errors.New("404")
+				log.Info().
+					Str("source", "internal.adapter.userRepository.DeleteUser").
+					Msg("No customer found")
+				return err
+			}
+			log.Error().
+				Err(err).
+				Str("source", "internal.adapter.userRepository.DeleteUser")
+			return err
+		}
+
+		if err := u.db.WithContext(ctx).Delete(&user).Error; err != nil {
+			log.Error().
+				Err(err).
+				Str("source", "internal.adapter.userRepository.DeleteUser")
+			return err
+		}
+
+		return nil
+	})
+
+	return err
 }

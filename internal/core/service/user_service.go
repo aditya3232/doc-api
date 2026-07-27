@@ -24,7 +24,6 @@ type userService struct {
 type UserServiceInterface interface {
 	SignIn(ctx context.Context, req entity.UserEntity) (*entity.UserEntity, string, error)
 	CreateUserAccount(ctx context.Context, req entity.UserEntity) error
-	UpdatePassword(ctx context.Context, req entity.UserEntity) error
 	GetProfileUser(ctx context.Context, userID int64) (*entity.UserEntity, error)
 	UpdateDataUser(ctx context.Context, req entity.UserEntity) error
 	GetUserAll(ctx context.Context, query entity.QueryStringUser) ([]entity.UserEntity, int64, int64, error)
@@ -50,33 +49,23 @@ func (u *userService) GetUserAll(ctx context.Context, query entity.QueryStringUs
 }
 
 func (u *userService) UpdateDataUser(ctx context.Context, req entity.UserEntity) error {
+	if req.Password != "" {
+		password, err := utils.HashPassword(req.Password)
+		if err != nil {
+			log.Error().
+				Err(err).
+				Str("source", "internal.core.userService.UpdateDataUser")
+			return err
+		}
+
+		req.Password = password
+	}
+
 	return u.repo.UpdateDataUser(ctx, req)
 }
 
 func (u *userService) GetProfileUser(ctx context.Context, userID int64) (*entity.UserEntity, error) {
 	return u.repo.GetUserByID(ctx, userID)
-}
-
-func (u *userService) UpdatePassword(ctx context.Context, req entity.UserEntity) error {
-	password, err := utils.HashPassword(req.Password)
-	if err != nil {
-		log.Error().
-			Err(err).
-			Str("source", "internal.core.userService.UpdatePassword")
-		return err
-	}
-
-	req.Password = password
-
-	err = u.repo.UpdatePasswordByID(ctx, req)
-	if err != nil {
-		log.Error().
-			Err(err).
-			Str("source", "internal.core.userService.UpdatePassword")
-		return err
-	}
-
-	return nil
 }
 
 func (u *userService) CreateUserAccount(ctx context.Context, req entity.UserEntity) error {

@@ -19,7 +19,6 @@ type userRepository struct {
 type UserRepositoryInterface interface {
 	GetUserByEmail(ctx context.Context, email string) (*entity.UserEntity, error)
 	CreateUserAccount(ctx context.Context, req entity.UserEntity) (int64, error)
-	UpdatePasswordByID(ctx context.Context, req entity.UserEntity) error
 	GetUserByID(ctx context.Context, userID int64) (*entity.UserEntity, error)
 	UpdateDataUser(ctx context.Context, req entity.UserEntity) error
 	GetUserAll(ctx context.Context, query entity.QueryStringUser) ([]entity.UserEntity, int64, int64, error)
@@ -78,41 +77,6 @@ func (u *userRepository) CreateUserAccount(ctx context.Context, req entity.UserE
 	return user.ID, nil
 }
 
-func (u *userRepository) UpdatePasswordByID(ctx context.Context, req entity.UserEntity) error {
-	user := model.User{}
-
-	err := u.db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.WithContext(ctx).Where("id = ?", req.ID).First(&user).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				err = errors.New("404")
-				log.Error().
-					Err(err).
-					Str("source", "internal.adapter.userRepository.UpdatePasswordByID")
-				return err
-			}
-
-			log.Error().
-				Err(err).
-				Str("source", "internal.adapter.userRepository.UpdatePasswordByID")
-
-			return err
-		}
-
-		if err := tx.Model(&user).Update("password", req.Password).Error; err != nil {
-			log.Error().
-				Err(err).
-				Str("source", "internal.adapter.userRepository.UpdatePasswordByID").
-				Msg("failed update password")
-
-			return err
-		}
-
-		return nil
-	})
-
-	return err
-}
-
 func (u *userRepository) GetUserByID(ctx context.Context, userID int64) (*entity.UserEntity, error) {
 	var user model.User
 
@@ -147,14 +111,19 @@ func (u *userRepository) GetUserByID(ctx context.Context, userID int64) (*entity
 }
 
 func (u *userRepository) UpdateDataUser(ctx context.Context, req entity.UserEntity) error {
-	result := u.db.WithContext(ctx).Model(&model.User{}).Where("id = ?", req.ID).Updates(map[string]any{
+	updateData := map[string]any{
 		"name":    req.Name,
 		"email":   req.Email,
 		"address": req.Address,
 		"phone":   req.Phone,
 		"photo":   req.Photo,
-	})
+	}
 
+	if req.Password != "" {
+		updateData["password"] = req.Password
+	}
+
+	result := u.db.WithContext(ctx).Model(&model.User{}).Where("id = ?", req.ID).Updates(updateData)
 	if result.Error != nil {
 		log.Error().
 			Err(result.Error).

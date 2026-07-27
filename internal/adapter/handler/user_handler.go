@@ -23,7 +23,6 @@ type userHandler struct {
 type UserHandlerInterface interface {
 	SignIn(c fiber.Ctx) error
 	CreateUserAccount(c fiber.Ctx) error
-	UpdatePassword(c fiber.Ctx) error
 	GetProfileUser(c fiber.Ctx) error
 	UpdateUser(c fiber.Ctx) error
 	UpdateProfileUser(c fiber.Ctx) error
@@ -47,7 +46,6 @@ func NewUserHandler(
 	// public route
 	app.Post("/signin", userHandler.SignIn)
 	app.Post("/signup", userHandler.CreateUserAccount)
-	app.Put("/update-password", userHandler.UpdatePassword)
 
 	// auth route
 	authGroup := app.Group("/auth", mid.CheckToken())
@@ -332,64 +330,9 @@ func (u *userHandler) GetUserAll(c fiber.Ctx) error {
 	)
 }
 
-func (u *userHandler) UpdatePassword(c fiber.Ctx) error {
-	var req request.UpdatePasswordRequest
-
-	ctx := c.Context()
-
-	tokenString := c.Query("token")
-	if tokenString == "" {
-		return fiber.NewError(fiber.StatusUnauthorized, "missing or invalid token")
-	}
-
-	if err := c.Bind().Body(&req); err != nil {
-		log.Error().
-			Err(err).
-			Str("source", "internal.adapter.userHandler.UpdatePassword").
-			Msg("failed bind/validate request")
-
-		return fiber.NewError(fiber.StatusBadRequest, err.Error())
-	}
-
-	if req.NewPassword != req.ConfirmPassword {
-		log.Error().
-			Str("source", "internal.adapter.userHandler.UpdatePassword").
-			Msg("password confirmation mismatch")
-
-		return fiber.NewError(fiber.StatusUnprocessableEntity, "new password and confirm password does not match")
-	}
-
-	reqEntity := entity.UserEntity{
-		Password: req.NewPassword,
-		Token:    tokenString,
-	}
-
-	if err := u.userService.UpdatePassword(ctx, reqEntity); err != nil {
-		log.Error().
-			Err(err).
-			Str("source", "internal.adapter.userHandler.UpdatePassword").
-			Msg("failed update password")
-
-		if err.Error() == "404" {
-			return fiber.NewError(fiber.StatusNotFound, "user not found")
-		}
-
-		if err.Error() == "401" {
-			return fiber.NewError(fiber.StatusUnauthorized, "token expired or invalid")
-		}
-
-		return err
-	}
-
-	return c.Status(fiber.StatusOK).JSON(response.DefaultResponse{
-		Message: "password updated successfully",
-		Data:    nil,
-	})
-}
-
 func (u *userHandler) UpdateProfileUser(c fiber.Ctx) error {
 	var (
-		req         request.UpdateDataUserRequest
+		req         request.UpdateProfileUserRequest
 		jwtUserData entity.JwtUserData
 	)
 
@@ -418,13 +361,22 @@ func (u *userHandler) UpdateProfileUser(c fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusBadRequest, err.Error())
 	}
 
+	if req.NewPassword != req.ConfirmPassword {
+		log.Error().
+			Str("source", "internal.adapter.userHandler.UpdatePassword").
+			Msg("password confirmation mismatch")
+
+		return fiber.NewError(fiber.StatusUnprocessableEntity, "new password and confirm password does not match")
+	}
+
 	reqEntity := entity.UserEntity{
-		ID:      jwtUserData.UserID,
-		Name:    req.Name,
-		Email:   req.Email,
-		Address: req.Address,
-		Phone:   req.Phone,
-		Photo:   req.Photo,
+		ID:       jwtUserData.UserID,
+		Name:     req.Name,
+		Email:    req.Email,
+		Address:  req.Address,
+		Phone:    req.Phone,
+		Photo:    req.Photo,
+		Password: req.NewPassword,
 	}
 
 	if err := u.userService.UpdateDataUser(ctx, reqEntity); err != nil {

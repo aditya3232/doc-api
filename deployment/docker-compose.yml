@@ -1,0 +1,134 @@
+name: doc-api
+services:
+  postgres-doc-api:
+    image: postgres:16
+    container_name: postgres-doc-api
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USER}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    ports:
+      - "${DATABASE_HOST_PORT}:${DATABASE_CONT_PORT}"
+    environment:
+      POSTGRES_USER: ${DATABASE_USER}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
+    volumes:
+      - postgresql_data:/var/lib/postgresql/data
+    networks:
+      - network-doc-api
+
+  minio-doc-api:
+    image: minio/minio:latest
+    container_name: minio-doc-api
+    ports:
+      - "${MINIO_HOST_PORT}:${MINIO_CONT_PORT}"
+      - "${MINIO_DASH_HOST_PORT}:${MINIO_DASH_CONT_PORT}"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
+    command: >
+      server /data
+      --address ":${MINIO_CONT_PORT}"
+      --console-address ":${MINIO_DASH_CONT_PORT}"
+    volumes:
+      - minio_data:/data
+    networks:
+      - network-doc-api
+
+  redis-doc-api:
+    image: redis:7.2
+    container_name: redis-doc-api
+    ports:
+      - "${REDIS_HOST_PORT}:${REDIS_CONT_PORT}"
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASSWORD}
+      --save ""
+      --appendonly no
+      --maxclients 10000
+      --timeout 0
+      --tcp-keepalive 60
+    networks:
+      - network-doc-api
+
+  doc-api-service-1:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: doc-api-service:latest
+    container_name: doc-api-service-1
+    depends_on:
+      postgres-doc-api:
+        condition: service_healthy
+      minio-doc-api:
+        condition: service_started
+      redis-doc-api:
+        condition: service_started
+    environment:
+      APP_PORT: ${DOC_API_SERVICE_1_CONT_PORT}
+      APP_ENV: ${APP_ENV}
+      APP_NAME: ${DOC_API_SERVICE_1_NAME}
+      WEB_PREFORK: ${WEB_PREFORK}
+      LOG_LEVEL: ${LOG_LEVEL}
+      JWT_SECRET_KEY: ${JWT_SECRET}
+      JWT_ISSUER: ${JWT_ISSUER}
+      DATABASE_HOST: postgres-doc-api
+      DATABASE_PORT: ${DATABASE_CONT_PORT}
+      DATABASE_USER: ${DATABASE_USER}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD}
+      DATABASE_NAME: ${DOC_API_SERVICE_DB}
+      DATABASE_MAX_OPEN_CONNECTION: ${DATABASE_MAX_OPEN_CONNECTION}
+      DATABASE_MAX_IDLE_CONNECTION: ${DATABASE_MAX_IDLE_CONNECTION}
+      MINIO_ENDPOINT: minio-doc-api:${MINIO_CONT_PORT}
+      MINIO_PUBLIC_URL: http://localhost:${MINIO_HOST_PORT} # pakai local
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+      MINIO_BUCKET: ${DOC_API_SERVICE_MINIO_BUCKET}
+      MINIO_USE_SSL: ${MINIO_USE_SSL}
+      REDIS_HOST: redis-doc-api
+      REDIS_PORT: ${REDIS_CONT_PORT}
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    networks:
+      - network-doc-api
+
+  doc-api-service-2:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: doc-api-service:latest
+    container_name: doc-api-service-2
+    depends_on:
+      postgres-doc-api:
+        condition: service_healthy
+      minio-doc-api:
+        condition: service_started
+      redis-doc-api:
+        condition: service_started
+    environment:
+      APP_PORT: ${DOC_API_SERVICE_2_CONT_PORT}
+      APP_ENV: ${APP_ENV}
+      APP_NAME: ${DOC_API_SERVICE_2_NAME}
+      WEB_PREFORK: ${WEB_PREFORK}
+      LOG_LEVEL: ${LOG_LEVEL}
+      JWT_SECRET_KEY: ${JWT_SECRET}
+      JWT_ISSUER: ${JWT_ISSUER}
+      DATABASE_HOST: postgres-doc-api
+      DATABASE_PORT: ${DATABASE_CONT_PORT}
+      DATABASE_USER: ${DATABASE_USER}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD}
+      DATABASE_NAME: ${DOC_API_SERVICE_DB}
+      DATABASE_MAX_OPEN_CONNECTION: ${DATABASE_MAX_OPEN_CONNECTION}
+      DATABASE_MAX_IDLE_CONNECTION: ${DATABASE_MAX_IDLE_CONNECTION}
+      MINIO_ENDPOINT: minio-doc-api:${MINIO_CONT_PORT}
+      MINIO_PUBLIC_URL: http://localhost:${MINIO_HOST_PORT} # pakai local
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+      MINIO_BUCKET: ${DOC_API_SERVICE_MINIO_BUCKET}
+      MINIO_USE_SSL: ${MINIO_USE_SSL}
+      REDIS_HOST: redis-doc-api
+      REDIS_PORT: ${REDIS_CONT_PORT}
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    networks:
+      - network-doc-api

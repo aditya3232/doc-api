@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"doc-api/config"
 	"doc-api/internal/core/domain/entity"
 	"time"
 
@@ -14,17 +15,19 @@ type healthCheckService struct {
 	redis *redis.Client
 	db    *gorm.DB
 	minio *minio.Client
+	cfg   *config.Config
 }
 
 type HealthCheckInterface interface {
 	HealthCheck(ctx context.Context) (*entity.HealthCheck, error)
 }
 
-func NewHealthCheckService(redis *redis.Client, db *gorm.DB, minio *minio.Client) HealthCheckInterface {
+func NewHealthCheckService(redis *redis.Client, db *gorm.DB, minio *minio.Client, cfg *config.Config) HealthCheckInterface {
 	return &healthCheckService{
 		redis: redis,
 		db:    db,
 		minio: minio,
+		cfg:   cfg,
 	}
 }
 
@@ -60,7 +63,7 @@ func (u *healthCheckService) HealthCheck(ctx context.Context) (*entity.HealthChe
 
 	return &entity.HealthCheck{
 		Status:    status,
-		Service:   "doc-api-service",
+		Service:   u.cfg.App.AppName,
 		Uptime:    time.Since(startedAt).Round(time.Second).String(),
 		Timestamp: time.Now().UTC(),
 		Dependencies: map[string]string{

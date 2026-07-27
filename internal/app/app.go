@@ -51,7 +51,7 @@ func RunServer() {
 	storageHandler := storage.NewMinioStorage(cfg, minio)
 	userRepo := repository.NewUserRepository(db.DB)
 	jwtService := service.NewJwtService(cfg)
-	healthCheckService := service.NewHealthCheckService(redis, db.DB, minio)
+	healthCheckService := service.NewHealthCheckService(redis, db.DB, minio, cfg)
 	userService := service.NewUserService(userRepo, cfg, jwtService, redis)
 
 	app := cfg.NewFiber()

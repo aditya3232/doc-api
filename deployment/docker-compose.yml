@@ -145,9 +145,11 @@ services:
       - doc-api-service-2
     ports:
       - "${HA_PROXY_HOST_PORT}:${HA_PROXY_CONT_PORT}"
+      - "443:443"
       - "${HA_PROXY_DASH_HOST_PORT}:${HA_PROXY_DASH_CONT_PORT}"
     volumes:
       - ./haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro # config ada di dalam deployment/haproxy
+      - ./haproxy/certs:/usr/local/etc/haproxy/certs:ro # digunakan untuk ssl crt
     networks:
       - network-doc-api
 

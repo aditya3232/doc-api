@@ -66,6 +66,8 @@ services:
         condition: service_started
       redis-doc-api:
         condition: service_started
+    expose: # port hanya terlihat oleh container lain di network yang sama
+      - "${DOC_API_SERVICE_1_CONT_PORT}"
     environment:
       APP_PORT: ${DOC_API_SERVICE_1_CONT_PORT}
       APP_ENV: ${APP_ENV}
@@ -106,6 +108,8 @@ services:
         condition: service_started
       redis-doc-api:
         condition: service_started
+    expose:
+      - "${DOC_API_SERVICE_2_CONT_PORT}"
     environment:
       APP_PORT: ${DOC_API_SERVICE_2_CONT_PORT}
       APP_ENV: ${APP_ENV}
@@ -132,3 +136,25 @@ services:
       REDIS_PASSWORD: ${REDIS_PASSWORD}
     networks:
       - network-doc-api
+
+  haproxy:
+    image: haproxy:lts
+    container_name: haproxy
+    depends_on:
+      - doc-api-service-1
+      - doc-api-service-2
+    ports:
+      - "${HA_PROXY_HOST_PORT}:${HA_PROXY_CONT_PORT}"
+      - "${HA_PROXY_DASH_HOST_PORT}:${HA_PROXY_DASH_CONT_PORT}"
+    volumes:
+      - ./haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro # config ada di dalam deployment/haproxy
+    networks:
+      - network-doc-api
+
+volumes:
+  postgresql_data:
+  minio_data:
+
+networks:
+  network-doc-api:
+    driver: bridge
